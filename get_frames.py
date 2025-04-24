@@ -4,13 +4,9 @@ import numpy as np
 import rosbag
 from tifffile import imwrite
 
-#TODO: Review folder structure for better fit project database
-#extract_frames.py has a better file management but lacks some important features
-
 def mk_dir(dirpath):
     if not os.path.exists(dirpath):
         os.mkdir(dirpath)
-
 
 def get_num_frames(filepath):
     topic = "/device_0/sensor_0/Depth_0/image/data"
@@ -18,9 +14,10 @@ def get_num_frames(filepath):
     nframes = int(bag.get_type_and_topic_info()[1][topic][1])
     return nframes
 
-
 def get_depth_frame(filepath, filename, outpath1, outpath2):
     nframes = get_num_frames(filepath)
+    color_array = None
+    depth_array = None
 
     try:
         config = rs.config()
@@ -73,28 +70,43 @@ def get_depth_frame(filepath, filename, outpath1, outpath2):
         for j in range(0, nframes):
             if j % (2 * 30):
                 imwrite(
-                    os.path.join(colorpath, video + "_frame_" + str(j + 1) + ".png"),
+                    os.path.join(colorpath, video + "_frame_" + str(j) + ".png"),
                     color_array[j],
                 )
                 imwrite(
-                    os.path.join(depthpath, video + "_frame_" + str(j + 1) + ".tif"),
+                    os.path.join(depthpath, video + "_frame_" + str(j) + ".tif"),
                     depth_array[j],
                 )
 
     finally:
         pipeline.stop()
 
+def main():
+    path = os.getcwd()
+    inpath = os.path.join(path, "data_renamed")
+    outpath1 = os.path.join(path, "color_images")
+    outpath2 = os.path.join(path, "depth_images")
 
-path = os.getcwd() # path to your hard-drive
-inpath = os.path.join(path, "videos")
-outpath1 = os.path.join(path, "color_images")
-outpath2 = os.path.join(path, "depth_images")
-video_files = os.listdir(inpath)
-mk_dir(outpath1)
-mk_dir(outpath2)
+    mk_dir(outpath1)
+    mk_dir(outpath2)
 
-for file in video_files:
-    filepath = os.path.join(inpath, file)
-    print(f"{file}---working\n")
-    get_depth_frame(filepath, file, outpath1, outpath2)
-    print(f"{file}---done\n")
+    video_files = [f for f in os.listdir(inpath) if f.endswith(".bag")]
+
+    for file in video_files:
+        base_name = os.path.splitext(file)[0]
+        color_folder = os.path.join(outpath1, base_name)
+        depth_folder = os.path.join(outpath2, base_name)
+
+        # Check if both folders exist and contain files
+        if (os.path.isdir(color_folder) and os.listdir(color_folder) and
+                os.path.isdir(depth_folder) and os.listdir(depth_folder)):
+            print(f"{file} --- skipped (already processed)")
+            continue
+
+        print(f"{file} --- working")
+        filepath = os.path.join(inpath, file)
+        get_depth_frame(filepath, file, outpath1, outpath2)
+        print(f"{file} --- done")
+
+if __name__ == "__main__": # YOU ONLY HAVE TO PRESS THE PLAY BOTTOM ON THE SIDE :) No worries!
+    main()
